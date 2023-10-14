@@ -1,0 +1,8 @@
+Table "animals"
+Columns:
+    name [text] "Name of the animal"
+    weight [kg] "Weight of the animal (as it has on the birth day)"
+    number_of_legs [-] "Number of legs of the animal"
+Description:
+    Table store the data about all animals in the world.
+    The purpose is to select the best animals for Noah's ark.
