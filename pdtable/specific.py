@@ -9,7 +9,11 @@ class SpecificationException(Exception):
 
 
 @dataclass(frozen=True)
-class ColumnDetails:
+class SpecificColumn:
+    """
+    Immutable, hashable and reusable specification of a column.
+    """
+    name: str
     unit: str
     description: str = ''
 
@@ -18,9 +22,9 @@ class SpecificDataTable(Table):
 
     _NAME: str | None = None
     _DESTINATIONS: set[str] = {'all'}
-    _COLUMNS: dict[str, ColumnDetails] | None = None
+    _COLUMNS: list[SpecificColumn] | None = None
 
-    def __init__(self, table_data_frame: TableDataFrame, validate_all: bool = False) -> None:
+    def __init__(self, table_data_frame: TableDataFrame, validate_all: bool = True) -> None:
         super().__init__(df=table_data_frame)
 
         if validate_all:
@@ -44,9 +48,9 @@ class SpecificDataTable(Table):
         if cls._COLUMNS is not None:
             description_lines.append(f'Columns:\n')
 
-            for column_name, column_details in cls._COLUMNS.items():
+            for column in cls._COLUMNS:
                 description_lines.append(
-                    f'    {column_name} [{column_details.unit}] "{column_details.description}"\n')
+                    f'    {column.name} [{column.unit}] "{column.description}"\n')
 
         doc = cls.__doc__
 
@@ -81,21 +85,22 @@ class SpecificDataTable(Table):
                     f'Table "{specified_name}" expected to define a class attribute "_COLUMNS".'
                 )
 
-            column_names = set(self._COLUMNS.keys())
+            name_to_column = {column.name: column for column in self._COLUMNS}
+            specified_column_names = set(name_to_column.keys())
 
-            if column_names != set(self.df.columns):
+            if specified_column_names != set(self.df.columns):
                 raise SpecificationException(
-                    f'Table "{specified_name}" expected to have the following columns: {column_names}.')
+                    f'Table "{specified_name}" expected to have the following columns: {specified_column_names}.')
 
             if validate_units:
                 for index, col_name in enumerate(self.df.columns):
                     unit = self.units[index]
-                    specified_unit = self._COLUMNS[col_name].unit
+                    specified_unit = name_to_column[col_name].unit
 
                     if unit != specified_unit:
                         raise SpecificationException(
                             f'Unit mismatch for column "{col_name}". '
-                            f'Expected = [{self._COLUMNS[col_name].unit}], got = [{unit}].')
+                            f'Expected = [{name_to_column[col_name].unit}], got = [{unit}].')
 
         if validate_destinations:
             if self._DESTINATIONS != self.destinations:
