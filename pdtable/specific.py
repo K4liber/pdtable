@@ -1,4 +1,3 @@
-from abc import ABC
 from dataclasses import dataclass
 
 from pdtable.frame import TableDataFrame
@@ -15,18 +14,13 @@ class ColumnDetails:
     description: str = ''
 
 
-class SpecificDataTable(ABC, Table):
+class SpecificDataTable(Table):
 
     _NAME: str | None = None
     _DESTINATIONS: set[str] = {'all'}
     _COLUMNS: dict[str, ColumnDetails] | None = None
 
     def __init__(self, table_data_frame: TableDataFrame, validate_all: bool = False) -> None:
-        if self._COLUMNS is None:
-            raise SpecificationException(
-                f'Specific data table needs to define a class attribute "_COLUMNS".'
-            )
-        
         super().__init__(df=table_data_frame)
 
         if validate_all:
@@ -82,6 +76,11 @@ class SpecificDataTable(ABC, Table):
                     f'Name mismatch. Expected = "{specified_name}", got = "{self.name}".')
 
         if validate_columns:
+            if self._COLUMNS is None:
+                raise SpecificationException(
+                    f'Table "{specified_name}" expected to define a class attribute "_COLUMNS".'
+                )
+
             column_names = set(self._COLUMNS.keys())
 
             if column_names != set(self.df.columns):
