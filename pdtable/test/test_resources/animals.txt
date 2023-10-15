@@ -1,4 +1,5 @@
 Table "animals"
+Destinations: {"all"}
 Columns:
     name [text] "Name of the animal"
     weight [kg] "Weight of the animal (as it has on the birth day)"
