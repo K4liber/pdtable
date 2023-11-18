@@ -50,8 +50,9 @@ and would the be preferable to the chosen approach.
 from warnings import warn
 
 import pandas as pd
+from pandas.util import hash_pandas_object
 import warnings
-from typing import Set, Dict, Optional, Iterable
+from typing import Any, Set, Dict, Optional, Iterable
 
 from .table_metadata import TableMetadata, ColumnMetadata, ComplementaryTableInfo
 from .table_origin import TableOrigin
@@ -64,6 +65,10 @@ class UnknownOperationError(Exception):
 
 
 class InvalidTableCombineError(Exception):
+    pass
+
+
+class ImmutabilityError(Exception):
     pass
 
 
@@ -113,12 +118,14 @@ def _combine_tables(
         strict_types = False
     elif hasattr(other, '_table_data') and not other._table_data.metadata.strict_types:
         strict_types = False
-
+    # Set immutable property if any of the table has immutable=True
+    immutable = any(table._table_data.metadata.immutable for table in src)
     meta = TableMetadata(
         name=data[0].metadata.name,
         destinations=data[0].metadata.destinations,
         origin=origin,
-        strict_types=strict_types
+        strict_types=strict_types,
+        immutable=immutable
     )
 
     # 2: Check that units match for columns that appear in more than one table
@@ -197,10 +204,37 @@ class TableDataFrame(pd.DataFrame):
 
     @staticmethod
     def from_table_info(df: pd.DataFrame, table_info: ComplementaryTableInfo) -> "TableDataFrame":
-        df = TableDataFrame(df)
+        if table_info.metadata.immutable:
+            df = ImmutableDataTable(df)
+        else:
+            df = TableDataFrame(df)
+
         object.__setattr__(df, _TABLE_INFO_FIELD_NAME, table_info)
         table_info._check_dataframe(df)
+        
+        if table_info.metadata.immutable:
+            setattr(df, '_origin_data_hash', TableDataFrame.get_data_hash(df=df))
+
         return df
+
+    @staticmethod
+    def get_data_hash(df: 'TableDataFrame') -> pd.Series:
+        return hash_pandas_object(df)
+
+    def data_not_changed(self) -> None:
+        """
+        Raises ImmutabilityError if data has been changed.
+        """
+        origin_data_hash = object.__getattribute__(self, '_origin_data_hash')
+
+        if origin_data_hash is None:
+            raise ImmutabilityError(f'Origin data hash has not been set.')
+
+        current_data_hash = TableDataFrame.get_data_hash(df=self)
+        
+        if not current_data_hash.equals(origin_data_hash):
+            raise ImmutabilityError(
+                'Table was modifed. It should not happened. Please contact maintainers.')
 
 
 def is_table_dataframe(df: Optional[pd.DataFrame]) -> bool:
@@ -320,3 +354,58 @@ def set_all_units(df: TableDataFrame, units: Iterable[Optional[str]]):
     columns = get_table_info(df).columns
     for col, unit in zip(df.columns, units):
         columns[col].unit = unit
+
+
+class ImmutableDataTable(TableDataFrame):
+
+    def __getattribute__(self, attribute_name: str) -> Any:
+        table_info: ComplementaryTableInfo = \
+            object.__getattribute__(self, _TABLE_INFO_FIELD_NAME)
+
+        if attribute_name == _TABLE_INFO_FIELD_NAME:
+            return table_info
+
+        if not table_info.metadata.immutable:
+            return object.__getattribute__(self, attribute_name)
+        
+        is_public = not attribute_name.startswith('_')
+        attr = object.__getattribute__(self, attribute_name)
+        
+        if is_public:
+            origin_data_hash = object.__getattribute__(self, '_origin_data_hash')
+            # TODO Saintinity, better raise an Error than allow to work on modifed data
+            # self.data_not_changed(origin_data_hash=object.__getattribute__(self, '_origin_data_hash'))
+            is_callable = hasattr(attr, '__call__')
+            is_indexable = hasattr(attr, '__getitem__')
+            allowed_attributes = {
+                'iloc', 'loc', 'dtypes', 'columns', 'dtype', 'index', 'origin_data_hash',
+                'attrs', 'flags', 'shape', 'axes', 'values', 'items', 'copy', 'table_data'
+            }
+            verify_after_call = False
+            
+            if attribute_name in allowed_attributes:
+                verify_after_call = False
+            elif is_callable:
+                verify_after_call = True
+            elif is_indexable:
+                raise ImmutabilityError(
+                    f'Table is immutable. Calling method "{attribute_name}" is not supported for an immutable table.')
+
+            if verify_after_call:
+
+                def decorated_attribute_call(*args, **kwargs):
+                    if 'inplace' in kwargs:
+                        raise ImmutabilityError(
+                            'Table is immutable. Cannot perform "inplace" operation.')
+
+                    result = attr(*args, **kwargs)
+
+                    if not TableDataFrame.get_data_hash(df=self).equals(origin_data_hash):
+                        raise ImmutabilityError(
+                            'Table was modifed. It should not happened. Please contact maintainers.')
+
+                    return result
+
+                return decorated_attribute_call
+
+        return attr

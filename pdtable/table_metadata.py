@@ -21,6 +21,7 @@ class TableMetadata:
     origin: Optional[TableOrigin] = None
     transposed: bool = False
     strict_types: bool = True
+    immutable: bool = False
 
     def __str__(self):
         dst = (
