@@ -9,6 +9,8 @@ from unittest import mock
 
 from pytest import raises
 
+import pdtable
+
 
 def test_openpyxl_absent(tmp_path):
     """Test behaviour when openpyxl is not installed
@@ -17,8 +19,6 @@ def test_openpyxl_absent(tmp_path):
     """
     # Mock openpyxl not being installed
     with mock.patch.dict(sys.modules, {'openpyxl': None}):
-        # Can import pdtable
-        import pdtable
 
         with raises(ImportError):
             # Fails on first use of read_excel
@@ -35,8 +35,7 @@ def test_pint_absent():
     pdtable should be fully functional, except the courtesy pint converter
     """
     with mock.patch.dict(sys.modules, {'pint': None}):
-        # Can import
-        import pdtable
+
         with raises(ImportError):
             # Fails on first use of pint_converter
             pdtable.pint_converter(1, "m", "mm")

@@ -18,11 +18,11 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest]      
-        python-version: [3.7, 3.9, 3.11]
+        python-version: [3.9, 3.11, 3.14]
         pandas-version: [1, 2]
         exclude:
-          - python-version: 3.7
-            pandas-version: 2
+          - python-version: 3.14
+            pandas-version: 1
 
     steps:
     - uses: actions/checkout@v2
@@ -59,10 +59,10 @@ jobs:
     steps:
     - uses: actions/checkout@v2
 
-    - name: Set up Python 3.7
+    - name: Set up Python 3.9
       uses: actions/setup-python@v2
       with:
-        python-version: 3.7
+        python-version: 3.9
 
     - name: Build package
       run: |

@@ -1,5 +1,6 @@
-pandas>=2.0
-numpy<2.0  # numpy 2 does not work for pint library on python3.9
+pandas>=2.0,<3.0
+numpy<2.0; python_version < "3.14"  # numpy 2 does not work for pint library on python3.9
+numpy>=2.0; python_version >= "3.14"
 typing-extensions
 pyarrow
 

@@ -47,17 +47,21 @@ It should be possible to maintain column metadata together with the column data 
 `ExtensionArray`. This option was discarded early due to performance concerns, but might be viable
 and would the be preferable to the chosen approach.
 """
+import warnings
+from typing import Dict, Iterable, Optional, Set
 from warnings import warn
 
 import pandas as pd
-import warnings
-from typing import Set, Dict, Optional, Iterable
 
-from .table_metadata import TableMetadata, ColumnMetadata, ComplementaryTableInfo
+from .table_metadata import ColumnMetadata, ComplementaryTableInfo, TableMetadata
 from .table_origin import TableOrigin
 
 _TABLE_INFO_FIELD_NAME = "_table_data"
 
+# Pandas operations that replace every value with a boolean. The resulting frame no
+# longer holds the data the column units describe, so the metadata cannot be carried
+# over and the result must degrade to a plain pandas.DataFrame.
+_METADATA_DROPPING_METHODS = frozenset({"isna", "notna", "isnull", "notnull", "isin"})
 
 class UnknownOperationError(Exception):
     pass
@@ -189,12 +193,18 @@ class TableDataFrame(pd.DataFrame):
         pandas operations. This may includes combining unit information and table origin for operations involving
         more than one table.
         """
+        if method in _METADATA_DROPPING_METHODS:
+            # The result is a boolean mask, not table data; units no longer apply.
+            return pd.DataFrame(self)
+
         table_info = _combine_tables(self, other, method, **kwargs)
+
         if table_info is None:
             warn(
                 "Unable to establish table metadata (units, origin, etc.). Will fall back to pd.DataFrame."
             )
             return pd.DataFrame(self)
+
         object.__setattr__(self, _TABLE_INFO_FIELD_NAME, table_info)
         table_info._check_dataframe(self)
         return self

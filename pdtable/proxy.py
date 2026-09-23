@@ -1,17 +1,18 @@
-from typing import Iterable, Union, Dict, List, Optional, Set, Callable, Sequence
+from typing import Callable, Dict, Iterable, List, Optional, Sequence, Set, Union
 
 import pandas as pd
 
+import pdtable  # for access to pdtable.units.default_converter
+
 from .frame import (
     TableDataFrame,
+    add_column,
     get_table_info,
     is_table_dataframe,
     make_table_dataframe,
     set_units,
-    add_column,
 )
-from .table_metadata import TableMetadata, ColumnMetadata, ComplementaryTableInfo
-import pdtable  # for access to pdtable.units.default_converter
+from .table_metadata import ColumnMetadata, ComplementaryTableInfo, TableMetadata
 
 INCONVERTIBLE_UNIT_INDICATORS = ["text", "datetime", "onoff"]
 UnitConverter = Callable[[float, str, str], float]
@@ -34,6 +35,7 @@ class Column:
     """
 
     def __init__(self, df: TableDataFrame, name: str, table_info: ComplementaryTableInfo = None):
+        self._df = df
         self._name = name
         self._values = df[name]
         if not table_info:
@@ -63,7 +65,11 @@ class Column:
 
     @values.setter
     def values(self, values):
-        self._values.update(pd.Series(values))
+        # Updating the Series returned by DataFrame.__getitem__ no longer reliably
+        # updates the parent dataframe with pandas 2.x. Assign through the parent
+        # dataframe so unit conversions update the table in all supported versions.
+        self._df[self._name] = values
+        self._values = self._df[self._name]
 
     def convert_units(self, to: Union[str, None], converter: UnitConverter):
         """Converts this column's units in place.
