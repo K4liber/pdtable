@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Support for Python 3.14 with pandas 2.
+
+### Changed
+
+- Dropped support for Python 3.7 and 3.8; Python 3.9 or newer is now required.
+- `TableDataFrame.isna()`, `notna()`, `isnull()`, `notnull()`, and `isin()` now return plain `pandas.DataFrame` objects without table metadata or a metadata fallback warning. Column units do not apply to the boolean masks returned by these methods.
+
+### Fixed
+
+- `Column.values` now assigns through the backing DataFrame so `convert_units()` reliably updates table values on pandas 2, including when Copy-on-Write is enabled.
+- `ParseFixer` now uses `np.nan` instead of the removed `np.NaN` alias for NumPy 2 compatibility.
+
 ## [1.0.1] - 2024-07-09
 
 ### Fixed

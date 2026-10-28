@@ -9,9 +9,10 @@ from pytest import fixture, raises
 
 import pdtable
 from pdtable.units.pint import PintUnitConverter, pint_converter
+
 from ..demo.unit_converter import convert_this
 from ..io.parsers.blocks import make_table
-from ..proxy import UnitConversionNotDefinedError, MissingUnitConverterError
+from ..proxy import MissingUnitConverterError, UnitConversionNotDefinedError
 
 
 def test_demo_converter__works():
@@ -155,6 +156,30 @@ def test_convert_units__dict(table_cells, cuc):
     # Column for which no conversion was requested stays unchanged
     np.testing.assert_array_equal(t["depth"].values, np.array([666, 666]))
     assert t["depth"].unit == "mm"
+
+
+@pytest.mark.parametrize("copy_on_write", [False, True])
+def test_convert_units__updates_backing_dataframe(table_cells, cuc, copy_on_write):
+    with pd.option_context("mode.copy_on_write", copy_on_write):
+        original = make_table(table_cells)
+        original.df.index = pd.Index([10, 20], name="measurement")
+        original_values = pd.DataFrame(original.df).copy(deep=True)
+        original_units = original.units.copy()
+
+        converted = original.convert_units(to={"diameter": "m", "mean_temp": "K"}, converter=cuc)
+
+        # Check the backing frame, not just a potentially detached column proxy.
+        expected = original_values.copy(deep=True)
+        expected["diameter"] = [42.0, 1.0]
+        expected["mean_temp"] = [293.15, np.nan]
+        pd.testing.assert_frame_equal(pd.DataFrame(converted.df), expected)
+        assert converted.units == ["m", "K", "mm", "text", "datetime"]
+
+        # Table.convert_units returns a new table and leaves the source unchanged.
+        assert converted is not original
+        assert converted.units != original.units
+        pd.testing.assert_frame_equal(pd.DataFrame(original.df), original_values)
+        assert original.units == original_units
 
 
 def test_convert_units__callable(table_cells, cuc):

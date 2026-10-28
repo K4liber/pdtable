@@ -54,7 +54,7 @@ setup(
     # You can just specify the packages manually here if your project is
     # simple. Or you can use find_packages().
     packages=find_packages(exclude=["contrib", "doc", "docs", "test", "tests"]),
-    python_requires=">=3.7",
+    python_requires=">=3.9",
     install_requires=["numpy", "pandas"],
     tests_require=["pytest", "openpyxl", "pint"],
     # Same for developer dependencies
